@@ -87,9 +87,6 @@ library SafeERC20 {
 
 import "./PineToken.sol";
 
-interface IMigratorChef {
-    function migrate(IERC20 token) external returns (IERC20);
-}
 
 // MasterChef is the master of PINE. He can make PINE and he is a fair guy.
 //
@@ -120,16 +117,16 @@ contract MasterChef is Ownable {
         uint256 lastRewardBlock; // Last block number that PINE distribution occurs.
         uint256 accPINEPerShare; // Accumulated PINE per share, times 1e12. See below.
         uint256 taxFee; // The fee to deposit and withdraw on this pool.
-        uint256 taxes; // Amount of taxes avaliable to withdraw.
+        uint256 taxes; // Amount of taxes available to withdraw.
     }
     // The PINE TOKEN!
-    PineToken public PINE;
+    PineToken public immutable PINE;
     //Pools, Farms, Dev percent decimals
-    uint256 public percentDec = 1000000;
+    uint256 public immutable percentDec = 1000000;
     //Pools and Farms percent from token per block
-    uint256 public stakingPercent;
+    uint256 public immutable stakingPercent;
     //Developers percent from token per block
-    uint256 public devPercent;
+    uint256 public immutable devPercent;
     // Dev address.
     address public devaddr;
     // Last block that developer withdrew dev fee
@@ -138,8 +135,6 @@ contract MasterChef is Ownable {
     uint256 public PinePerBlock;
     // Bonus muliplier for early PINE makers.
     uint256 public BONUS_MULTIPLIER = 1;
-    // The migrator contract. It has a lot of power. Can only be set through governance (owner).
-    IMigratorChef public migrator;
     // Info of each pool.
     PoolInfo[] public poolInfo;
     // Info of each user that stakes LP tokens.
@@ -147,9 +142,11 @@ contract MasterChef is Ownable {
     // Total allocation poitns. Must be the sum of all allocation points in all pools.
     uint256 public totalAllocPoint = 0;
     // The block number when PINE mining starts.
-    uint256 public startBlock;
+    uint256 public immutable startBlock;
     // Deposited amount PINE in MasterChef
     uint256 public depositedPine;
+    // Mapping of farms alrady added
+    mapping(address => bool) private addedFarms;
 
     event Deposit(address indexed user, uint256 indexed pid, uint256 amount);
     event Withdraw(address indexed user, uint256 indexed pid, uint256 amount);
@@ -181,7 +178,7 @@ contract MasterChef is Ownable {
         poolInfo.push(PoolInfo({
             lpToken: _PINE,
             allocPoint: 0,
-            lastRewardBlock: startBlock,
+            lastRewardBlock: _startBlock,
             accPINEPerShare: 0,
             taxFee: _stakingTax,
             taxes: 0
@@ -208,8 +205,8 @@ contract MasterChef is Ownable {
     }
 
     // Add a new lp to the pool. Can only be called by the owner.
-    // XXX DO NOT add the same LP token more than once. Rewards will be messed up if you do.
     function add( uint256 _allocPoint, IERC20 _lpToken, bool _withUpdate, uint256 _taxFee ) public onlyOwner {
+        require(addedFarms[address(_lpToken)] == false, "lp already added.");
         require(_taxFee <= 100000, "taxFee is higher than 10%");
         if (_withUpdate) {
             massUpdatePools();
@@ -246,22 +243,6 @@ contract MasterChef is Ownable {
         poolInfo[_pid].taxFee =_taxFee;
     }
 
-    // Set the migrator contract. Can only be called by the owner.
-    function setMigrator(IMigratorChef _migrator) public onlyOwner {
-        migrator = _migrator;
-    }
-
-    // Migrate lp token to another lp contract. Can be called by anyone. We trust that migrator contract is good.
-    function migrate(uint256 _pid) public {
-        require(address(migrator) != address(0), "migrate: no migrator");
-        PoolInfo storage pool = poolInfo[_pid];
-        IERC20 lpToken = pool.lpToken;
-        uint256 bal = lpToken.balanceOf(address(this));
-        lpToken.safeApprove(address(migrator), bal);
-        IERC20 newLpToken = migrator.migrate(lpToken);
-        require(bal == newLpToken.balanceOf(address(this)), "migrate: bad");
-        pool.lpToken = newLpToken;
-    }
 
     // Return reward multiplier over the given _from to _to block.
     function getMultiplier(uint256 _from, uint256 _to) public view returns (uint256) {
@@ -285,7 +266,7 @@ contract MasterChef is Ownable {
         return user.amount.mul(accPINEPerShare).div(1e12).sub(user.rewardDebt);
     }
 
-    // Update reward vairables for all pools. Be careful of gas spending!
+    // Update reward variables for all pools. Be careful of gas spending!
     function massUpdatePools() public {
         uint256 length = poolInfo.length;
         for (uint256 pid = 0; pid < length; ++pid) {
@@ -308,7 +289,7 @@ contract MasterChef is Ownable {
             return;
         }
         uint256 multiplier = getMultiplier(pool.lastRewardBlock, block.number);
-        uint256 PineReward = multiplier.mul(PinePerBlock).mul(pool.allocPoint).div(totalAllocPoint).mul(stakingPercent).div(percentDec);
+        uint256 PineReward = multiplier.mul(PinePerBlock).mul(pool.allocPoint).mul(stakingPercent).div(totalAllocPoint).div(percentDec);
         PINE.mint(address(this), PineReward);
         pool.accPINEPerShare = pool.accPINEPerShare.add(PineReward.mul(1e12).div(lpSupply));
         pool.lastRewardBlock = block.number;
