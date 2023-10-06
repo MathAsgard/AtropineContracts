@@ -752,19 +752,6 @@ contract ERC20 is Context, IERC20, Ownable {
     }
 
     /**
-     * @dev Creates `amount` tokens and assigns them to `msg.sender`, increasing
-     * the total supply.
-     *
-     * Requirements
-     *
-     * - `msg.sender` must be the token owner
-     */
-    function mint(uint256 amount) public onlyOwner returns (bool) {
-        _mint(_msgSender(), amount);
-        return true;
-    }
-
-    /**
      * @dev Moves tokens `amount` from `sender` to `recipient`.
      *
      * This is internal function is equivalent to {transfer}, and can be used to
@@ -872,8 +859,6 @@ contract ERC20 is Context, IERC20, Ownable {
 pragma solidity 0.6.12;
 
 contract PineToken is ERC20('Atropine', 'PINE') {
-    // @notice Creates `_amount` token to `_to`. Must only be called by the minter (MasterChef).
-    
     /* 
         When a new minter is set, the timestamp is stored. 
         Minter can only be updated to the new minter address 
@@ -894,7 +879,8 @@ contract PineToken is ERC20('Atropine', 'PINE') {
         initialized = 1;
         minter = _masterChef;
     }
-
+    
+    // @notice Creates `_amount` token to `_to`. Must only be called by the minter (MasterChef).
     function mint(address _to, uint256 _amount) public {
         require(msg.sender == minter, "PINE: Permission declined");
         _mint(_to, _amount);
@@ -918,8 +904,7 @@ contract PineToken is ERC20('Atropine', 'PINE') {
      */
     function updateMinter() public onlyOwner returns (bool) {
         require(newMinter != address(0), "PINE: no new minter set");
-        require(block.timestamp >= updatedAt + 14 days, "PINE: You can only update the minter 14 days after setting a new one"); //  Minter will only be added 14 adysd after transactions has been pushed. 
-
+        require(block.timestamp >= updatedAt + 14 days, "PINE: You can only update the minter 14 days after setting a new one");
         minter = newMinter;
         newMinter = address(0);
         updatedAt = 0;
