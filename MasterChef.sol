@@ -145,7 +145,7 @@ contract MasterChef is Ownable {
     uint256 public immutable startBlock;
     // Deposited amount PINE in MasterChef
     uint256 public depositedPine;
-    // Mapping of farms alrady added
+    // Mapping of farms already added
     mapping(address => bool) private addedFarms;
 
     event Deposit(address indexed user, uint256 indexed pid, uint256 amount);
@@ -223,6 +223,7 @@ contract MasterChef is Ownable {
                 taxes: 0
             })
         );
+        addedFarms[address(_lpToken)] = true;
     }
 
     // Update the given pool's PINE allocation point. Can only be called by the owner.
